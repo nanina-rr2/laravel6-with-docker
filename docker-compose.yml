@@ -1,0 +1,111 @@
+version: "3"
+services:
+  app:
+    build:
+      context: ./docker/php
+      args:
+        - TZ=${TZ:-Asia/Tokyo}
+    ports:
+      - ${APP_PORT:-18000}:8000
+    volumes:
+      - ${PROJECT_PATH:-./src}:/work
+      - ./docker/ash:/etc/profile.d
+      - ./docker/php/psysh:/root/.config/psysh
+      - ./logs:/var/log/php
+      - ./docker/php/php.ini:/usr/local/etc/php/php.ini
+    working_dir: /work
+    environment:
+      - DB_CONNECTION=mysql
+      - DB_HOST=db
+      - DB_DATABASE=${DB_NAME:-homestead}
+      - DB_USERNAME=${DB_USER:-homestead}
+      - DB_PASSWORD=${DB_PASS:-secret}
+      - TZ=${TZ:-Asia/Tokyo}
+      - MAIL_HOST=${MAIL_HOST:-mail}
+      - MAIL_PORT=${MAIL_PORT:-1025}
+      - CACHE_DRIVER=redis
+      - SESSION_DRIVER=redis
+      - QUEUE_DRIVER=redis
+      - REDIS_HOST=redis
+
+  web:
+    container_name: web
+    build: ./docker
+    ports:
+      - 80:80
+    privileged: true
+    volumes:
+      - ./server:/var/www/html
+
+  db:
+    image: mysql:8.0
+    volumes:
+      - db-store:/var/lib/mysql
+      - ./logs:/var/log/mysql
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+    environment:
+      - MYSQL_DATABASE=${DB_NAME:-homestead}
+      - MYSQL_USER=${DB_USER:-homestead}
+      - MYSQL_PASSWORD=${DB_PASS:-secret}
+      - MYSQL_ROOT_PASSWORD=${DB_PASS:-secret}
+      - TZ=${TZ:-Asia/Tokyo}
+    ports:
+      - ${DB_PORT:-13306}:3306
+
+  db-testing:
+    image: mysql:8.0
+    volumes:
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+    tmpfs:
+      - /var/lib/mysql
+      - /var/log/mysql
+    environment:
+      - MYSQL_DATABASE=${DB_NAME:-homestead}
+      - MYSQL_USER=${DB_USER:-homestead}
+      - MYSQL_PASSWORD=${DB_PASS:-secret}
+      - MYSQL_ROOT_PASSWORD=${DB_PASS:-secret}
+      - TZ=${TZ:-Asia/Tokyo}
+    ports:
+      - ${DB_TESTING_PORT:-13307}:3306
+
+  mongo:
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    ports:
+      - 27017:27017
+    volumes:
+      - ./db:/data/db
+      - ./configdb:/data/configdb
+
+  mongo-express:
+    image: mongo-express
+    restart: always
+    ports:
+      - 8081:8081
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: example
+
+  node:
+    image: node:12.14-alpine
+    tty: true
+    volumes:
+      - ${PROJECT_PATH:-./src}:/work
+    working_dir: /work
+
+  redis:
+    image: redis:5.0-alpine
+    volumes:
+      - redis-store:/data
+
+  mail:
+    image: mailhog/mailhog
+    ports:
+      - ${MAILHOG_PORT:-18025}:8025
+
+volumes:
+  db-store:
+  redis-store:
